@@ -1,8 +1,9 @@
-name: Package Synthetiq modules
+name: Package and publish Synthetiq modules
 
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - "module.json"
       - "index.js"
@@ -10,7 +11,7 @@ on:
       - ".github/workflows/package-github-library.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   package:
@@ -26,14 +27,57 @@ jobs:
           node --check index.js
           node -e "const m=require('./module.json'); if(m.id!=='audius-music-v1'||m.contentType!=='music'||m.contractVersion!==4||!m.config||!m.config.runtime||m.config.runtime.entry!=='index.js') process.exit(1)"
 
+      - name: Live Audius search and stream smoke test
+        run: |
+          node --input-type=module <<'NODE'
+          const base = 'https://api.audius.co/v1';
+          const app = 'SynthetiqMusic';
+          const search = new URL(base + '/tracks/search');
+          search.searchParams.set('query', 'Lefty SM somos guerreros');
+          search.searchParams.set('limit', '5');
+          search.searchParams.set('app_name', app);
+          const response = await fetch(search, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(15000) });
+          if (!response.ok) throw new Error('Audius search HTTP ' + response.status);
+          const payload = await response.json();
+          if (!Array.isArray(payload.data)) throw new Error('Audius search response has no data array');
+          const track = payload.data.find(t => t && t.id && t.title && t.is_streamable !== false && t.isStreamable !== false);
+          if (!track) throw new Error('Search returned no streamable test track');
+          console.log('Search OK:', JSON.stringify({ id: track.id, title: track.title, artist: track.user?.name || track.user?.handle || 'unknown' }));
+          const stream = new URL(base + '/tracks/' + encodeURIComponent(String(track.id)) + '/stream');
+          stream.searchParams.set('app_name', app);
+          const streamResponse = await fetch(stream, { method: 'GET', headers: { Range: 'bytes=0-0', Accept: 'audio/*,*/*;q=0.8' }, redirect: 'manual', signal: AbortSignal.timeout(15000) });
+          if (!(streamResponse.ok || [301, 302, 303, 307, 308].includes(streamResponse.status))) {
+            throw new Error('Audius stream endpoint HTTP ' + streamResponse.status);
+          }
+          if ([301, 302, 303, 307, 308].includes(streamResponse.status) && !streamResponse.headers.get('location')) {
+            throw new Error('Audius stream redirect had no Location header');
+          }
+          console.log('Stream endpoint OK:', JSON.stringify({ status: streamResponse.status, redirected: [301,302,303,307,308].includes(streamResponse.status), hasLocation: !!streamResponse.headers.get('location') }));
+          NODE
+
       - name: Build Audius music ZIP with manifest at root
         run: |
           mkdir -p dist
           (cd . && zip -X dist/Audius-Music-Synthetiq.zip module.json index.js)
           unzip -t dist/Audius-Music-Synthetiq.zip
           test "$(unzip -Z1 dist/Audius-Music-Synthetiq.zip | sort | tr '\n' ' ')" = "index.js module.json "
+          sha256sum dist/Audius-Music-Synthetiq.zip
 
-      - name: Upload Audius music module ZIP
+      - name: Publish Audius module ZIP to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="audius-v$(node -p "require('./module.json').version")"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/Audius-Music-Synthetiq.zip --clobber
+          else
+            gh release create "$TAG" dist/Audius-Music-Synthetiq.zip \
+              --title "Audius Music Synthetiq $(node -p "require('./module.json').version")" \
+              --notes "Automated Synthetiq Audius music module package. The workflow validates ZIP structure and runs a live Audius search/stream-endpoint smoke test. Actual playback inside Synthetiq iOS must still be tested in-app." \
+              --prerelease
+          fi
+
+      - name: Upload Audius module as workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: Audius-Music-Synthetiq
