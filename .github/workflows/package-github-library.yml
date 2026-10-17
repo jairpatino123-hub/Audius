@@ -1,0 +1,41 @@
+name: Package Github Library module
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "github-v1/**"
+      - ".github/workflows/package-github-library.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate module files
+        run: |
+          test -f github-v1/github-v1.json
+          test -f github-v1/index.js
+          node --check github-v1/index.js
+          node -e "const m=require('./github-v1/github-v1.json'); if(m.id!=='github-v1'||m.contentType!=='text'||m.contractVersion!==3) process.exit(1)"
+
+      - name: Build ZIP with required module folder
+        run: |
+          mkdir -p dist
+          cd github-v1
+          zip -X -r ../dist/Github-Library-Synthetiq.zip github-v1.json index.js
+          cd ..
+          unzip -t dist/Github-Library-Synthetiq.zip
+
+      - name: Upload ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Github-Library-Synthetiq
+          path: dist/Github-Library-Synthetiq.zip
+          if-no-files-found: error
+          retention-days: 30
