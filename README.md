@@ -2,24 +2,27 @@
 
 This repository contains two separate Synthetiq modules:
 
-- **Audius music adapter** — experimental; live API and iOS playback are not yet verified.
-- **Github Library** — a text module that lists files and reads text from this repository's public GitHub repository.
+- **Audius Music** — experimental music source using the Audius API. Package validation is automated; real playback still needs testing in Synthetiq Player on iOS.
+- **Github Library** — a text module that lists files and reads text from this public GitHub repository.
+
+## Audius Music module
+
+- `module.json` — music-module manifest at the ZIP root.
+- `index.js` — local handlers for track search, trending/home, and stream URL resolution.
+
+The build validates the manifest, checks JavaScript syntax, and creates `Audius-Music-Synthetiq.zip` with exactly `module.json` and `index.js` at the archive root. In Synthetiq, use the **Audius-Music-Synthetiq** artifact, not the Github Library artifact.
+
+The module uses the public Audius API. Availability, region/provider restrictions, redirects, and Synthetiq's playback runtime can still affect playback. The automated build does not certify live playback.
 
 ## Github Library module
 
-Module files:
-- `github-v1/github-v1.json` — Synthetiq v3 manifest.
-- `github-v1/index.js` — text handlers for file-path search, details, Markdown headings, and file text.
-- `.github/workflows/package-github-library.yml` — validates the module and builds a ZIP artifact.
+- `github-v1/github-v1.json` — Synthetiq v3 text-module manifest.
+- `github-v1/index.js` — file-path search, file details, Markdown headings, and file text handlers.
 
-The Github Library adapter is intentionally scoped to the public repository `jairpatino123-hub/Audius`. Search matches file paths, not GitHub code contents. It does not execute repository code. GitHub API rate limits and Synthetiq runtime/network restrictions may affect operation.
+The Github Library adapter is intentionally scoped to this repository. Search matches file paths, not GitHub code contents, and it does not execute repository code.
 
-## Build the import ZIP
+## Build and download
 
-Open **Actions → Package Github Library module → Run workflow**. After it succeeds, open the workflow run and download the `Github-Library-Synthetiq` artifact. The artifact contains the module folder and its manifest.
+Open [GitHub Actions](https://github.com/jairpatino123-hub/Audius/actions/workflows/package-github-library.yml), open the latest successful **Package Synthetiq modules** run, and download the **Audius-Music-Synthetiq** artifact to install the music module. GitHub downloads artifacts as an outer ZIP; extract that artifact ZIP once to obtain `Audius-Music-Synthetiq.zip`, then import the inner module ZIP into Synthetiq.
 
-The workflow validates JSON, JavaScript syntax, and ZIP integrity. It does **not** verify import or live functionality in Synthetiq Player on iOS.
-
-## Existing Audius module
-
-The existing Audius music adapter remains experimental. Its live API and real iPhone playback remain unverified; keep a working music source as a fallback until device testing passes.
+The workflow validates the module manifests, JavaScript syntax, and ZIP integrity. It does **not** verify installation or live playback in Synthetiq Player on iOS.
