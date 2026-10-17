@@ -3,30 +3,29 @@
 This repository contains an experimental Audius music-source adapter for Synthetiq Player.
 
 ## Files
-- `module.json` — Synthetiq module manifest.
-- `index.js` — local JavaScript source adapter.
-- `docs/VALIDATION.md` — testing status, install notes, and known limitations.
-- `Audius-Synthetiq-Experimental.zip` — distributable ZIP (if added as a repository artifact).
+- `module.json` — Synthetiq manifest, including module identity fields.
+- `index.js` — local JavaScript adapter.
+- `docs/VALIDATION.md` — test results and known limitations.
+- `dist/Audius-Synthetiq-Experimental.zip` — flat import package.
 
-## Current status: experimental, not verified on-device
+## Status: improved, still experimental
 
-Local JavaScript syntax and mocked contract behavior passed during preparation. The mock used a fake response and **does not prove that the live Audius API or Synthetiq iOS playback works**.
+Static checks and mocked contract tests pass for search-result mapping, stream URL construction, the `fetchv2` transport path, and ZIP structure. The live Audius API could not be reached from the available test environment because DNS resolution failed. Real iPhone import and playback remain unverified.
 
-Not yet verified:
-- Live Audius search/trending API calls from Synthetiq
-- Import acceptance by Synthetiq Player 9.0.81+261 on iOS
-- Redirect handling, full-track playback, seeking, and background playback
-- Availability of any specific recording
+## Fixes in version 0.1.1
+- Added the module identity and identity-number fields used by Synthetiq's catalogue.
+- Changed playback export to `extractStreamUrl`, matching the published Synthetiq module pattern.
+- Returned ordinary track arrays/stream objects instead of the previous `{ok, data: JSON.stringify(...)}` wrapper.
+- Added support for Synthetiq's `fetchv2` transport as well as standard `fetch`.
+- Filtered tracks marked unstreamable using either `isStreamable` or `is_streamable`.
 
-Audius' catalogue is not universal; some recordings may be missing or not streamable. Keep your current working music source as a fallback.
+## Remaining checks
+- Live Audius search and trending API responses
+- Import acceptance in Synthetiq Player 9.0.81+261 on iOS
+- Whether the app follows Audius stream redirects and decodes the returned audio
+- Seeking, background playback, and specific-track availability
 
-## Module behavior
-- Searches Audius tracks and maps results to a Synthetiq-style track object.
-- Shows a Trending on Audius home section.
-- Resolves selected track IDs using Audius' `/tracks/{id}/stream` endpoint.
-- Does not embed API credentials or enable offline downloads.
+Audius does not guarantee every recording is present or streamable. Keep your current working source as a fallback until the module passes device testing.
 
-## Installation
-Use only if your Synthetiq build supports importing a local module ZIP. If import fails, preserve the exact error message; do not replace your current source or catalogue entry based on this experimental adapter.
-
-See [docs/VALIDATION.md](docs/VALIDATION.md) for detailed status.
+## Install
+Use the ZIP only if your Synthetiq build supports importing a local module ZIP. If import fails, save the exact error message. Do not replace your working source based on this experimental adapter.
