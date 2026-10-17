@@ -1,16 +1,20 @@
 {
   "id": "audius-music-v1",
   "name": "Audius Music (Experimental)",
-  "description": "Experimental Audius track search and streaming adapter. Requires real-device playback validation before catalogue publication.",
-  "type": "client",
+  "description": "Experimental Audius music source for Synthetiq. Search and playback still require live API and iOS validation.",
   "contentType": "music",
   "contractVersion": 4,
   "formatVersion": 3,
-  "moduleVersion": "0.1.0",
+  "moduleVersion": "0.1.1",
+  "version": "0.1.1",
   "moduleFamilyId": "audius_music",
+  "moduleIdentity": "SP-MUS-3006-AUDIUS",
+  "moduleIdentityNumber": 3006,
   "releaseTrack": "experimental",
+  "moduleStatus": "experimental",
   "baseUrl": "https://api.audius.co/v1",
   "config": {
+    "baseUrl": "https://api.audius.co/v1",
     "capabilities": {
       "music_home_v1": true
     },
@@ -26,6 +30,5 @@
     },
     "playbackMode": "full",
     "allowOfflineDownload": false
-  },
-  "moduleStatus": "experimental"
+  }
 }
