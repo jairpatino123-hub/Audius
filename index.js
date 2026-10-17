@@ -46,10 +46,72 @@
       durationSeconds: Number.isFinite(duration) && duration > 0 ? duration : undefined,
       isrc: raw.isrc || undefined };
   }
+  function decodeCatalogueId(value) {
+    const encoded = String(value || '').slice('catalogue:'.length).replace(/-/g, '+').replace(/_/g, '/');
+    if (!encoded || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) return null;
+    try {
+      const padded = encoded + '='.repeat((4 - encoded.length % 4) % 4);
+      const binary = typeof atob === 'function'
+        ? atob(padded)
+        : '';
+      if (!binary) return null;
+      let decoded;
+      try {
+        decoded = decodeURIComponent(Array.prototype.map.call(binary, ch =>
+          '%' + ch.charCodeAt(0).toString(16).padStart(2, '0')).join(''));
+      } catch (_) {
+        decoded = binary;
+      }
+      const parts = decoded.split('\\u0000');
+      const title = String(parts[0] || '').trim();
+      const artist = String(parts.slice(1).join(' ').replace(/\\u0000/g, ' ') || '').trim();
+      return title ? { title, artist } : null;
+    } catch (_) {
+      return null;
+    }
+  }
   function extractId(trackId) {
     const value = String(trackId || '').trim();
     const match = value.match(/^(?:audius:song:|audius:|track:)?([A-Za-z0-9_-]{1,128})$/);
     return match ? match[1] : '';
+  }
+  function normalizeText(value) {
+    return String(value || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ').trim();
+  }
+  async function resolveCatalogueTrack(value) {
+    const metadata = decodeCatalogueId(value);
+    if (!metadata) throw new Error('This catalogue ID is not a native Audius track ID and its title could not be decoded.');
+    const queries = [metadata.title + (metadata.artist ? ' ' + metadata.artist : ''), metadata.title];
+    let candidates = [];
+    for (const query of queries) {
+      const payload = await getJson(apiUrl('/tracks/search', { query, limit: 10, offset: 0 }));
+      if (payload && Array.isArray(payload.data)) {
+        candidates = payload.data.filter(track => track && track.id != null &&
+          track.title && track.isStreamable !== false && track.is_streamable !== false);
+      }
+      if (candidates.length) break;
+    }
+    const wantedTitle = normalizeText(metadata.title);
+    const wantedArtist = normalizeText(metadata.artist);
+    const scored = candidates.map(track => {
+      const title = normalizeText(track.title);
+      const artist = normalizeText((track.user && (track.user.name || track.user.handle)) || track.artist || '');
+      let score = 0;
+      if (title === wantedTitle) score += 100;
+      else if (title.includes(wantedTitle) || wantedTitle.includes(title)) score += 55;
+      if (wantedArtist && artist) {
+        if (artist === wantedArtist) score += 45;
+        else if (artist.includes(wantedArtist) || wantedArtist.includes(artist)) score += 20;
+      }
+      return { track, score };
+    }).sort((a, b) => b.score - a.score);
+    const best = scored[0];
+    if (!best || best.score < (wantedArtist ? 55 : 55)) {
+      throw new Error('No matching streamable Audius track was found for: ' + metadata.title +
+        (metadata.artist ? ' — ' + metadata.artist : ''));
+    }
+    return String(best.track.id);
   }
   async function searchResults(query, page) {
     const term = String(query || '').trim();
@@ -60,7 +122,12 @@
     return payload.data.map(toTrack).filter(Boolean).slice(0, MAX_RESULTS);
   }
   async function extractStreamUrl(trackId, quality, bypassCache) {
-    const id = extractId(trackId);
+    const value = String(trackId || '').trim();
+    // Synthetiq may pass an internal catalogue key rather than an Audius ID.
+    // Catalogue keys encode title and artist as base64 text separated by NUL.
+    const id = value.startsWith('catalogue:')
+      ? await resolveCatalogueTrack(value)
+      : extractId(value);
     if (!id) throw new Error('Invalid Audius track ID; search for the track again.');
     const url = apiUrl('/tracks/' + encodeURIComponent(id) + '/stream', {});
     return { url, stream: url, streamType: 'mp3',
