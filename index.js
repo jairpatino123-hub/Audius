@@ -46,22 +46,32 @@
       durationSeconds: Number.isFinite(duration) && duration > 0 ? duration : undefined,
       isrc: raw.isrc || undefined };
   }
+  function decodeBase64Utf8(encoded) {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    const input = String(encoded || '').replace(/=+$/, '');
+    let bytes = [], buffer = 0, bits = 0;
+    for (let i = 0; i < input.length; i++) {
+      const value = alphabet.indexOf(input[i]);
+      if (value < 0) return '';
+      buffer = (buffer << 6) | value;
+      bits += 6;
+      if (bits >= 8) {
+        bits -= 8;
+        bytes.push((buffer >> bits) & 255);
+      }
+    }
+    try {
+      return decodeURIComponent(bytes.map(b => '%' + b.toString(16).padStart(2, '0')).join(''));
+    } catch (_) {
+      return bytes.map(b => String.fromCharCode(b)).join('');
+    }
+  }
   function decodeCatalogueId(value) {
     const encoded = String(value || '').slice('catalogue:'.length).replace(/-/g, '+').replace(/_/g, '/');
     if (!encoded || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) return null;
     try {
-      const padded = encoded + '='.repeat((4 - encoded.length % 4) % 4);
-      const binary = typeof atob === 'function'
-        ? atob(padded)
-        : '';
-      if (!binary) return null;
-      let decoded;
-      try {
-        decoded = decodeURIComponent(Array.prototype.map.call(binary, ch =>
-          '%' + ch.charCodeAt(0).toString(16).padStart(2, '0')).join(''));
-      } catch (_) {
-        decoded = binary;
-      }
+      const decoded = decodeBase64Utf8(encoded);
+      if (!decoded) return null;
       const parts = decoded.split('\u0000');
       const title = String(parts[0] || '').trim();
       const artist = String(parts.slice(1).join(' ').replace(/\u0000/g, ' ') || '').trim();
@@ -81,35 +91,47 @@
   }
   async function resolveCatalogueTrack(value) {
     const metadata = decodeCatalogueId(value);
-    if (!metadata) throw new Error('This catalogue ID is not a native Audius track ID and its title could not be decoded.');
-    const queries = [metadata.title + (metadata.artist ? ' ' + metadata.artist : ''), metadata.title];
-    let candidates = [];
+    if (!metadata) throw new Error('Catalogue track metadata could not be decoded in this runtime.');
+    const queries = [];
+    if (metadata.title && metadata.artist) queries.push(metadata.title + ' ' + metadata.artist);
+    if (metadata.title) queries.push(metadata.title);
+    const byId = Object.create(null);
     for (const query of queries) {
-      const payload = await getJson(apiUrl('/tracks/search', { query, limit: 10, offset: 0 }));
-      if (payload && Array.isArray(payload.data)) {
-        candidates = payload.data.filter(track => track && track.id != null &&
-          track.title && track.isStreamable !== false && track.is_streamable !== false);
+      try {
+        const payload = await getJson(apiUrl('/tracks/search', { query, limit: 20, offset: 0 }));
+        if (payload && Array.isArray(payload.data)) {
+          payload.data.forEach(track => {
+            if (track && track.id != null && track.title &&
+                track.isStreamable !== false && track.is_streamable !== false) {
+              byId[String(track.id)] = track;
+            }
+          });
+        }
+      } catch (_) {
+        // Try the next query; a title-only search can succeed when artist matching fails.
       }
-      if (candidates.length) break;
     }
+    const candidates = Object.keys(byId).map(id => byId[id]);
     const wantedTitle = normalizeText(metadata.title);
     const wantedArtist = normalizeText(metadata.artist);
     const scored = candidates.map(track => {
       const title = normalizeText(track.title);
       const artist = normalizeText((track.user && (track.user.name || track.user.handle)) || track.artist || '');
-      let score = 0;
-      if (title === wantedTitle) score += 100;
-      else if (title.includes(wantedTitle) || wantedTitle.includes(title)) score += 55;
+      let titleScore = 0, artistScore = 0;
+      if (title === wantedTitle) titleScore = 100;
+      else if (title.includes(wantedTitle) || wantedTitle.includes(title)) titleScore = 55;
       if (wantedArtist && artist) {
-        if (artist === wantedArtist) score += 45;
-        else if (artist.includes(wantedArtist) || wantedArtist.includes(artist)) score += 20;
+        if (artist === wantedArtist) artistScore = 45;
+        else if (artist.includes(wantedArtist) || wantedArtist.includes(artist)) artistScore = 20;
       }
-      return { track, score };
+      return { track, score: titleScore + artistScore, titleScore, artistScore };
     }).sort((a, b) => b.score - a.score);
     const best = scored[0];
-    if (!best || best.score < (wantedArtist ? 55 : 55)) {
-      throw new Error('No matching streamable Audius track was found for: ' + metadata.title +
-        (metadata.artist ? ' — ' + metadata.artist : ''));
+    const artistMismatch = wantedArtist && best && best.artistScore === 0;
+    if (!best || best.titleScore < 55 || (artistMismatch && best.titleScore < 100)) {
+      throw new Error('No confidently matching streamable Audius track found for catalogue entry: ' +
+        metadata.title + (metadata.artist ? ' — ' + metadata.artist : '') +
+        '. The track may not be available on Audius.');
     }
     return String(best.track.id);
   }
