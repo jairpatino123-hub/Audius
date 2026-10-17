@@ -62,9 +62,9 @@
       } catch (_) {
         decoded = binary;
       }
-      const parts = decoded.split('\\u0000');
+      const parts = decoded.split('\u0000');
       const title = String(parts[0] || '').trim();
-      const artist = String(parts.slice(1).join(' ').replace(/\\u0000/g, ' ') || '').trim();
+      const artist = String(parts.slice(1).join(' ').replace(/\u0000/g, ' ') || '').trim();
       return title ? { title, artist } : null;
     } catch (_) {
       return null;
@@ -76,7 +76,7 @@
     return match ? match[1] : '';
   }
   function normalizeText(value) {
-    return String(value || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase()
+    return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
       .replace(/[^a-z0-9]+/g, ' ').trim();
   }
   async function resolveCatalogueTrack(value) {
