@@ -1,9 +1,11 @@
-name: Package Github Library module
+name: Package Synthetiq modules
 
 on:
   workflow_dispatch:
   push:
     paths:
+      - "module.json"
+      - "index.js"
       - "github-v1/**"
       - ".github/workflows/package-github-library.yml"
 
@@ -17,20 +19,41 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Validate module files
+      - name: Validate Audius music module
+        run: |
+          test -f module.json
+          test -f index.js
+          node --check index.js
+          node -e "const m=require('./module.json'); if(m.id!=='audius-music-v1'||m.contentType!=='music'||m.contractVersion!==4||!m.config||!m.config.runtime||m.config.runtime.entry!=='index.js') process.exit(1)"
+
+      - name: Build Audius music ZIP with manifest at root
+        run: |
+          mkdir -p dist
+          (cd . && zip -X dist/Audius-Music-Synthetiq.zip module.json index.js)
+          unzip -t dist/Audius-Music-Synthetiq.zip
+          test "$(unzip -Z1 dist/Audius-Music-Synthetiq.zip | sort | tr '\n' ' ')" = "index.js module.json "
+
+      - name: Upload Audius music module ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: Audius-Music-Synthetiq
+          path: dist/Audius-Music-Synthetiq.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Validate Github Library module
         run: |
           test -f github-v1/github-v1.json
           test -f github-v1/index.js
           node --check github-v1/index.js
           node -e "const m=require('./github-v1/github-v1.json'); if(m.id!=='github-v1'||m.contentType!=='text'||m.contractVersion!==3) process.exit(1)"
 
-      - name: Build ZIP preserving module folder
+      - name: Build Github Library ZIP preserving module folder
         run: |
-          mkdir -p dist
           zip -X -r dist/Github-Library-Synthetiq.zip github-v1
           unzip -t dist/Github-Library-Synthetiq.zip
 
-      - name: Upload ZIP artifact
+      - name: Upload Github Library module ZIP
         uses: actions/upload-artifact@v4
         with:
           name: Github-Library-Synthetiq
