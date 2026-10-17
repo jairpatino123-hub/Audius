@@ -24,12 +24,10 @@ jobs:
           node --check github-v1/index.js
           node -e "const m=require('./github-v1/github-v1.json'); if(m.id!=='github-v1'||m.contentType!=='text'||m.contractVersion!==3) process.exit(1)"
 
-      - name: Build ZIP with required module folder
+      - name: Build ZIP preserving module folder
         run: |
           mkdir -p dist
-          cd github-v1
-          zip -X -r ../dist/Github-Library-Synthetiq.zip github-v1.json index.js
-          cd ..
+          zip -X -r dist/Github-Library-Synthetiq.zip github-v1
           unzip -t dist/Github-Library-Synthetiq.zip
 
       - name: Upload ZIP artifact
