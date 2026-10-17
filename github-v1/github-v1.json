@@ -1,0 +1,26 @@
+{
+  "id": "github-v1",
+  "name": "Github Library",
+  "description": "Browse files and read text from the configured public GitHub repository. Search matches file paths, not GitHub code contents.",
+  "contentType": "text",
+  "contractVersion": 3,
+  "moduleVersion": "1.0.0",
+  "moduleFamilyId": "github_library_v1",
+  "moduleIdentity": "SP-TXT-9001-GITHUB-LIBRARY",
+  "moduleIdentityNumber": 9001,
+  "releaseTrack": "stable",
+  "baseUrl": "https://github.com/jairpatino123-hub/Audius.git",
+  "config": {
+    "baseUrl": "https://github.com/jairpatino123-hub/Audius.git",
+    "runtime": {
+      "entry": "index.js",
+      "mode": "local"
+    },
+    "caps": {
+      "homeMaxResults": 30,
+      "maxResponseBytes": 524288,
+      "timeoutMs": 20000,
+      "maxConcurrentRequests": 2
+    }
+  }
+}
