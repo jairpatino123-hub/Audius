@@ -33,7 +33,7 @@ jobs:
           const base = 'https://api.audius.co/v1';
           const app = 'SynthetiqMusic';
           const search = new URL(base + '/tracks/search');
-          search.searchParams.set('query', 'Lefty SM somos guerreros');
+          search.searchParams.set('query', 'electronic music');
           search.searchParams.set('limit', '5');
           search.searchParams.set('app_name', app);
           const response = await fetch(search, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(15000) });
