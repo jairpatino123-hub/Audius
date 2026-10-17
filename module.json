@@ -1,0 +1,31 @@
+{
+  "id": "audius-music-v1",
+  "name": "Audius Music (Experimental)",
+  "description": "Experimental Audius track search and streaming adapter. Requires real-device playback validation before catalogue publication.",
+  "type": "client",
+  "contentType": "music",
+  "contractVersion": 4,
+  "formatVersion": 3,
+  "moduleVersion": "0.1.0",
+  "moduleFamilyId": "audius_music",
+  "releaseTrack": "experimental",
+  "baseUrl": "https://api.audius.co/v1",
+  "config": {
+    "capabilities": {
+      "music_home_v1": true
+    },
+    "runtime": {
+      "mode": "local",
+      "entry": "index.js"
+    },
+    "caps": {
+      "homeMaxResults": 24,
+      "maxResponseBytes": 262144,
+      "timeoutMs": 10000,
+      "maxConcurrentRequests": 1
+    },
+    "playbackMode": "full",
+    "allowOfflineDownload": false
+  },
+  "moduleStatus": "experimental"
+}
